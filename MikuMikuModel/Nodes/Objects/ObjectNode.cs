@@ -72,12 +72,12 @@ public class ObjectNode : Node<Object>
 
             // open json
             using (var jsonFileDialog = new OpenFileDialog()
-                   {
-                       Title = "Select BoneMap json file.",
-                       Filter = "JSON files (*.json)|*.json|All files(*.*)|*.*",
-                       FilterIndex = 0,
-                       RestoreDirectory = true,
-                   })
+            {
+                Title = "Select BoneMap json file.",
+                Filter = "JSON files (*.json)|*.json|All files(*.*)|*.*",
+                FilterIndex = 0,
+                RestoreDirectory = true,
+            })
             {
                 if (jsonFileDialog.ShowDialog() == DialogResult.OK)
                     jsonFilePath = jsonFileDialog.FileName;
@@ -159,6 +159,8 @@ public class ObjectNode : Node<Object>
             exp_Root.Expressions.Add("= 8 v 8.RootBone");
             Data.Skin.Blocks.Add(exp_Root);
 
+            uint boneId = 32769;
+
             foreach (var bone in Data.Skin.Bones)
             {
 
@@ -174,7 +176,6 @@ public class ObjectNode : Node<Object>
                     {
                         Name = "RootBone"
                     };
-
                 if (boneMap.TryGetValue(bone.Name, out string sourceNodeName))
                 {
                     var oriConstraintBlock = new ConstraintBlock
@@ -203,6 +204,7 @@ public class ObjectNode : Node<Object>
                     dummyExpBlock.Expressions.Add("");
                     Data.Skin.Blocks.Add(dummyExpBlock);
                 }
+                bone.Id = boneId++;
             }
 
             // sort all blocks
