@@ -37,7 +37,7 @@ public class ObjectSetNode : BinaryFileNode<ObjectSet>
     private INode mTextureSetNode;
 
     public override NodeFlags Flags =>
-        NodeFlags.Add | NodeFlags.Export | NodeFlags.Replace | NodeFlags.Rename;
+        NodeFlags.Add | NodeFlags.Import | NodeFlags.Export | NodeFlags.Replace | NodeFlags.Rename;
 
     public override Bitmap Image =>
         ResourceStore.LoadBitmap("Icons/ObjectSet.png");
@@ -57,6 +57,80 @@ public class ObjectSetNode : BinaryFileNode<ObjectSet>
 
     protected override void Initialize()
     {
+        AddImportHandler<Scene>(filePath =>
+        {
+            ObjectSet importSet = AssimpImporter.ImportFromFile(filePath);
+
+            using (var itemSelectForm = new ItemSelectForm<Object>(importSet.Objects.Select(x => (x, x.Name)))
+            {
+                Text = "Please select the objects you would like to import",
+                GroupBoxText = "Objects"
+            })
+            {
+                if (itemSelectForm.ShowDialog() == DialogResult.OK)
+                {
+                    var importedObjects = new List<Object>(importSet.Objects.Count);
+
+                    foreach (var obj in itemSelectForm.CheckedItems)
+                    {
+                        importedObjects.Add(obj);
+                    }
+
+                    // find which textures are used
+
+                    List<uint> texIds = new List<uint>();
+
+                    foreach (var obj in importedObjects)
+                    {
+                        foreach (var mat in obj.Materials)
+                        {
+                            foreach (var tex in mat.MaterialTextures)
+                            {
+                                if (tex.TextureId != MurmurHash.Calculate("") && tex.TextureId != 0xFFFFFFFF)
+                                {
+                                    // make it reference the hash to prevent conflicts
+                                    var sourceTex = importSet.TextureSet.Textures.Find(x => x.Id == tex.TextureId);
+                                    if (sourceTex != null)
+                                    {
+                                        tex.TextureId = MurmurHash.Calculate(sourceTex.Name);
+                                        sourceTex.Id = tex.TextureId;
+                                        Data.TextureSet.Textures.Add(sourceTex);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Data.Objects.AddRange(importedObjects.Distinct());
+                }
+            }
+        });
+
+        AddImportHandler<ObjectSet>(filePath =>
+        {
+            ObjectSet importSet = new ObjectSet();
+            importSet.Load(filePath);
+
+            using (var itemSelectForm = new ItemSelectForm<Object>(importSet.Objects.Select(x => (x, x.Name)))
+            {
+                Text = "Please select the objects you would like to import",
+                GroupBoxText = "Objects"
+            })
+            {
+                if (itemSelectForm.ShowDialog() == DialogResult.OK)
+                {
+                    var importedObjects = new List<Object>(importSet.Objects.Count);
+
+                    foreach (var obj in itemSelectForm.CheckedItems)
+                    {
+                        importedObjects.Add(obj);
+                    }
+
+                    Data.Objects.AddRange(importedObjects.Distinct());
+                }
+            }
+        });
+
         AddExportHandler<ObjectSet>(filePath =>
         {
             if (filePath.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase))
@@ -116,10 +190,10 @@ public class ObjectSetNode : BinaryFileNode<ObjectSet>
             else
             {
                 using (var inputDialog = new InputDialog
-                       {
-                           WindowTitle = "Enter base id for objects",
-                           Input = Math.Max(0, Data.Objects.Max(x => x.Id) + 1).ToString()
-                       })
+                {
+                    WindowTitle = "Enter base id for objects",
+                    Input = Math.Max(0, Data.Objects.Max(x => x.Id) + 1).ToString()
+                })
                 {
                     while (inputDialog.ShowDialog() == DialogResult.OK)
                     {
@@ -272,17 +346,17 @@ public class ObjectSetNode : BinaryFileNode<ObjectSet>
                         continue;
 
                     if (obj.Skin.Blocks.Any(x =>
+                    {
+                        switch (x)
                         {
-                            switch (x)
-                            {
-                                case OsageBlock osgBlock:
-                                    return osgBlock.Nodes.Any(y => y.Name == bone.Name);
-                                case ExpressionBlock expBlock:
-                                    return expBlock.Name == bone.Name;
-                                default:
-                                    return false;
-                            }
-                        }))
+                            case OsageBlock osgBlock:
+                                return osgBlock.Nodes.Any(y => y.Name == bone.Name);
+                            case ExpressionBlock expBlock:
+                                return expBlock.Name == bone.Name;
+                            default:
+                                return false;
+                        }
+                    }))
                         continue;
 
                     if (bone.Parent == null)
@@ -728,18 +802,18 @@ public class ObjectSetNode : BinaryFileNode<ObjectSet>
         if (materialOverrideMap.Count > 0)
         {
             using (var itemSelectForm = new ItemSelectForm<Material>(materialOverrideMap.OrderBy(x => x.Key.Name).Select(x =>
-                   {
-                       string name = x.Key.Name;
-                       if (Data.Objects.Count > 1)
-                           name += " (" + x.Value.SourceObject.Name + ")";
+            {
+                string name = x.Key.Name;
+                if (Data.Objects.Count > 1)
+                    name += " (" + x.Value.SourceObject.Name + ")";
 
-                       return (x.Key, name);
-                   }))
-                   {
-                       Text = "Please select the materials you want to override.",
-                       GroupBoxText = "Materials",
-                       CheckBoxText = "Override only textures"
-                   })
+                return (x.Key, name);
+            }))
+            {
+                Text = "Please select the materials you want to override.",
+                GroupBoxText = "Materials",
+                CheckBoxText = "Override only textures"
+            })
             {
                 if (itemSelectForm.ShowDialog() == DialogResult.OK)
                 {
