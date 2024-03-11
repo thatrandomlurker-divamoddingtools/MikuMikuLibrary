@@ -126,6 +126,31 @@ public class ObjectSetNode : BinaryFileNode<ObjectSet>
                         importedObjects.Add(obj);
                     }
 
+                    // find which textures are used
+
+                    List<uint> texIds = new List<uint>();
+
+                    foreach (var obj in importedObjects)
+                    {
+                        foreach (var mat in obj.Materials)
+                        {
+                            foreach (var tex in mat.MaterialTextures)
+                            {
+                                if (tex.TextureId != MurmurHash.Calculate("") && tex.TextureId != 0xFFFFFFFF)
+                                {
+                                    // make it reference the hash to prevent conflicts
+                                    var sourceTex = importSet.TextureSet.Textures.Find(x => x.Id == tex.TextureId);
+                                    if (sourceTex != null)
+                                    {
+                                        tex.TextureId = MurmurHash.Calculate(sourceTex.Name);
+                                        sourceTex.Id = tex.TextureId;
+                                        Data.TextureSet.Textures.Add(sourceTex);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Data.Objects.AddRange(importedObjects.Distinct());
                 }
             }
