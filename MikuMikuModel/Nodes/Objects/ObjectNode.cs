@@ -11,6 +11,10 @@ using MikuMikuLibrary.Objects.Extra.Blocks;
 using MikuMikuLibrary.Extensions;
 using MikuMikuModel.Modules;
 using MikuMikuModel.Nodes.IO;
+using Scene = Assimp.Scene;
+using MikuMikuLibrary.Objects.Processing.Assimp;
+using MikuMikuLibrary.Objects.Processing.Fbx;
+using MikuMikuModel.Configurations;
 
 namespace MikuMikuModel.Nodes.Objects;
 
@@ -63,6 +67,46 @@ public class ObjectNode : Node<Object>
 
     protected override void Initialize()
     {
+        AddExportHandler<ObjectSet>(filePath =>
+        {
+            // create temp objset containing only this object
+
+            ObjectSet exportSet = new ObjectSet();
+            var parent = Parent.Parent as ObjectSetNode; // this *should* be true
+            exportSet.TextureSet = parent.Data.TextureSet;
+
+            exportSet.Objects.Add(Data);
+
+            if (filePath.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase))
+            {
+                exportSet.TryFixParentBoneInfos(SourceConfiguration?.BoneData);
+                FbxExporter.ExportToFile(exportSet, filePath);
+            }
+
+            else
+            {
+                var configuration = ConfigurationList.Instance.CurrentConfiguration;
+
+                var objectDatabase = configuration?.ObjectDatabase;
+                var textureDatabase = configuration?.TextureDatabase;
+                var boneDatabase = configuration?.BoneData;
+
+                exportSet.Save(filePath, objectDatabase, textureDatabase, boneDatabase);
+            }
+        });
+        AddExportHandler<Scene>(filePath =>
+        {
+            // create temp objset containing only this object
+
+            ObjectSet exportSet = new ObjectSet();
+            var parent = Parent as ObjectSetNode; // this *should* be true
+            exportSet.TextureSet = parent.Data.TextureSet;
+
+            exportSet.Objects.Add(Data);
+
+            exportSet.TryFixParentBoneInfos(SourceConfiguration?.BoneData);
+            AssimpExporter.ExportToFile(exportSet, filePath);
+        });
         AddCustomHandler("Auto Create Constraints", () =>
         {
             string jsonFilePath = null;
